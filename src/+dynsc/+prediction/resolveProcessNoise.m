@@ -1,0 +1,39 @@
+function cfg = resolveProcessNoise(cfg, nEdges, nTriangles)
+%RESOLVEPROCESSNOISE Resolve fixed process-noise specifications when possible.
+
+if ~(isstring(cfg.Q) || ischar(cfg.Q))
+    return;
+end
+
+specification = string(cfg.Q);
+validSpecifications = ["block_diagonal", "bernoulli_second_moment"];
+assert(isscalar(specification) && ...
+    any(specification == validSpecifications), ...
+    'dynsc:InvalidProcessNoiseSpecification', ...
+    ['Text-valued Q must be "block_diagonal" or ' ...
+     '"bernoulli_second_moment".']);
+
+cfg.Q = specification;
+if specification == "bernoulli_second_moment"
+    % This covariance depends on the previous corrected state and is
+    % therefore resolved separately at every prediction step.
+    return;
+end
+
+assert(isfield(cfg, 'processNoise') && ...
+    isfield(cfg.processNoise, 'qEdge') && ...
+    isfield(cfg.processNoise, 'qTriangle'), ...
+    'dynsc:MissingProcessNoiseParameters', ...
+    ['Block-diagonal process noise requires processNoise.qEdge and ' ...
+     'processNoise.qTriangle.']);
+
+qEdge = cfg.processNoise.qEdge;
+qTriangle = cfg.processNoise.qTriangle;
+validateattributes(qEdge, {'numeric'}, ...
+    {'scalar', 'real', 'finite', 'nonnegative'});
+validateattributes(qTriangle, {'numeric'}, ...
+    {'scalar', 'real', 'finite', 'nonnegative'});
+
+cfg.Q = blkdiag(qEdge * eye(nEdges), ...
+    qTriangle * eye(nTriangles));
+end
